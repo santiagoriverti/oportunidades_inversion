@@ -1,0 +1,19 @@
+# Dependencias para correr LOCALMENTE el análisis, los tests y los scripts.
+# Los notebooks corren en Google Colab, que ya trae todo salvo la última versión de yfinance
+# (la celda de configuración hace `pip install -U yfinance`).
+#   pip install -r requirements.txt
+# Probado el 2026-11-06 con Python 3.14 y: pandas 2.3.3, numpy 2.4.6, scipy 1.17.1, scikit-learn 1.9.0,
+# yfinance 1.8.0, plotly 7.1.0, openpyxl 3.1.5, requests 2.34.2, matplotlib 3.10.9, pytest 9.1.1.
+# CI (GitHub Actions) corre los tests con Python 3.12, como Colab.
+pandas>=2.1
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.3   # covarianza Ledoit-Wolf
+yfinance>=0.2.54    # precios y fundamentales de Yahoo Finance
+plotly>=5.18        # gráficos interactivos
+openpyxl>=3.1       # Excel de resultados
+requests>=2.31      # cotizaciones de CEDEARs (data912)
+matplotlib>=3.7     # colores de las tablas (pandas Styler)
+jinja2>=3.1         # pandas Styler
+pytest>=7.4
+nbformat>=5.9       # tests de los notebooks

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Salidas locales (no versionar)
+# - ZIPs, Excel y reportes que generan los notebooks y scripts
+_descargas/
+# - copias de notebooks para probar con nbconvert
+_local_run/
+# - corridas guardadas en la PC (en Colab van a Google Drive)
+registros_local/
+data/cache/
+
+# Entornos
+.venv/
+.env
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
