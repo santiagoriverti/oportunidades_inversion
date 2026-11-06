@@ -100,8 +100,12 @@ def reporte_html(titulo: str, bloques: list[tuple[str, object]], ruta: str | Pat
         partes.append(f"<h2>{html.escape(sub)}</h2>")
         if hasattr(obj, "to_html") and hasattr(obj, "data") and hasattr(obj, "layout"):
             partes.append(obj.to_html(full_html=False, include_plotlyjs=False, config={"displaylogo": False}))
+        elif hasattr(obj, "to_html") and hasattr(obj, "data") and hasattr(obj, "format"):  # pandas Styler
+            tabla = obj.set_table_attributes('class="tabla"').to_html()
+            partes.append(f'<div class="tabla-scroll">{tabla}</div>')
         elif isinstance(obj, pd.DataFrame):
-            partes.append(obj.to_html(classes="tabla", float_format=lambda x: f"{x:,.4g}", na_rep="–", border=0))
+            tabla = obj.to_html(classes="tabla", float_format=lambda x: f"{x:,.4g}", na_rep="–", border=0)
+            partes.append(f'<div class="tabla-scroll">{tabla}</div>')
         else:
             partes.append(f"<p>{html.escape(str(obj))}</p>")
     doc = f"""<!DOCTYPE html>
@@ -113,7 +117,9 @@ body {{ font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; c
 h1 {{ font-size: 24px; }} h2 {{ font-size: 18px; margin-top: 36px; color: #0b0b0b; }}
 p.nota {{ color: #52514e; font-size: 14px; }}
 table.tabla {{ border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }}
-table.tabla th, table.tabla td {{ padding: 4px 8px; border-bottom: 1px solid #e1e0d9; text-align: right; }}
+table.tabla th, table.tabla td {{ padding: 4px 8px; border-bottom: 1px solid #e1e0d9; text-align: right;
+                                 white-space: nowrap; }}
+div.tabla-scroll {{ overflow-x: auto; }}
 table.tabla th {{ color: #52514e; }}
 </style></head><body>
 <h1>{html.escape(titulo)}</h1>

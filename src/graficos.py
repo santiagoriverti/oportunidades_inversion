@@ -105,9 +105,12 @@ def fig_ranking(tabla: pd.DataFrame, n: int = 30, nombres: dict | None = None) -
                           "<br>señales: %{customdata[2]}<br>alertas: %{customdata[3]}<extra></extra>",
         )
     fig.update_layout(barmode="overlay", bargap=0.25, xaxis_range=[0, 105], xaxis_title="score (0-100)",
-                      yaxis={"categoryorder": "array", "categoryarray": list(t.index)},
-                      legend={"orientation": "h", "y": 1.02, "yanchor": "bottom", "x": 0})
-    return _estilo(fig, f"Score de oportunidad — {len(t)} mejores", alto=max(380, 22 * len(t) + 140))
+                      yaxis={"categoryorder": "array", "categoryarray": list(t.index)})
+    fig = _estilo(fig, f"Score de oportunidad — {len(t)} mejores", alto=max(400, 22 * len(t) + 170))
+    # leyenda horizontal debajo del título (con margen propio para que no se pisen)
+    fig.update_layout(margin={"t": 115}, title={"y": 0.985, "yanchor": "top"},
+                      legend={"orientation": "h", "y": 1.0, "yanchor": "bottom", "x": 0})
+    return fig
 
 
 def fig_mapa_senales(tabla: pd.DataFrame, n: int = 25) -> go.Figure:
@@ -183,8 +186,9 @@ def fig_frontera(frontera: pd.DataFrame | None, mu: pd.Series, cov: pd.DataFrame
             continue
         ww = w.reindex(cov.index).fillna(0.0).to_numpy()
         v, r = float(np.sqrt(ww @ S @ ww)) * 100, float(ww @ mu.reindex(cov.index).fillna(0).to_numpy()) * 100
-        fig.add_scatter(x=[v], y=[r], mode="markers+text", name=NOMBRES.get(k, k), text=[NOMBRES.get(k, k)],
-                        textposition="middle right", textfont={"color": TINTA_2, "size": 11},
+        # sin etiqueta sobre el punto: los diversificados quedan muy juntos y los textos se pisaban; la identidad
+        # va por color + símbolo + leyenda (y la tabla de resumen)
+        fig.add_scatter(x=[v], y=[r], mode="markers", name=NOMBRES.get(k, k),
                         marker={"size": 13, "color": _color(k), "symbol": SIMBOLO_PORTAFOLIO.get(k, "circle"),
                                 "line": {"color": SUPERFICIE, "width": 2}},
                         hovertemplate=f"<b>{NOMBRES.get(k, k)}</b><br>vol %{{x:.1f}}% · ret %{{y:.1f}}%"
@@ -201,13 +205,17 @@ def fig_pesos(pesos: dict[str, pd.Series], max_filas: int = 30) -> go.Figure:
         return _estilo(go.Figure(), "Pesos por portafolio (sin datos)")
     orden = df.max(axis=1).sort_values(ascending=False).index
     arriba, resto = list(orden[:max_filas]), list(orden[max_filas:])
-    tabla = df.loc[arriba]
+    tabla = df.loc[arriba].copy()
+    zmax = max(5.0, float(tabla.to_numpy().max() * 100))
     if resto:
         tabla.loc[f"otros ({len(resto)})"] = df.loc[resto].sum()
     texto = np.where(tabla.to_numpy() >= 0.05, (tabla * 100).round(0).astype(int).astype(str) + "%", "")
+    z = tabla.to_numpy() * 100
+    if resto:
+        z[-1, :] = np.nan  # la fila "otros" suma muchos activos: va sin color (solo el número) para no aplastar la escala
     fig = go.Figure(go.Heatmap(
-        z=tabla.to_numpy() * 100, x=list(tabla.columns), y=list(tabla.index), colorscale=SECUENCIAL,
-        zmin=0, zmax=max(5.0, float(tabla.to_numpy().max() * 100)), xgap=2, ygap=2, text=texto,
+        z=z, x=list(tabla.columns), y=list(tabla.index), colorscale=SECUENCIAL,
+        zmin=0, zmax=zmax, xgap=2, ygap=2, text=texto,
         texttemplate="%{text}", textfont={"size": 10}, colorbar={"title": "peso %", "thickness": 12},
         hovertemplate="<b>%{y}</b> en %{x}: %{z:.1f}%<extra></extra>"))
     fig.update_yaxes(autorange="reversed", showgrid=False)
@@ -217,9 +225,13 @@ def fig_pesos(pesos: dict[str, pd.Series], max_filas: int = 30) -> go.Figure:
     return fig
 
 
-def fig_contribucion_riesgo(pesos: dict[str, pd.Series], cov: pd.DataFrame, top: int = 15) -> go.Figure:
-    """Peso vs aporte al riesgo de cada activo (menú por portafolio): quién manda en el riesgo."""
+def fig_contribucion_riesgo(pesos: dict[str, pd.Series], cov: pd.DataFrame, top: int = 15,
+                            inicial: str = "maximo_sharpe") -> go.Figure:
+    """Peso vs aporte al riesgo de cada activo (menú por portafolio): quién manda en el riesgo. Arranca
+    mostrando ``inicial`` (en 1/N todos pesan lo mismo y el gráfico dice poco)."""
     claves = [k for k, w in pesos.items() if w is not None]
+    if inicial in claves:
+        claves = [inicial] + [k for k in claves if k != inicial]
     fig = go.Figure()
     for i, k in enumerate(claves):
         w = pesos[k].reindex(cov.index).fillna(0.0)

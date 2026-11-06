@@ -1,72 +1,80 @@
 # ESTADO — oportunidades_inversion
 
-**Última actualización:** 2026-11-06 (sesión 1, cortada por límite de uso). Punto de entrada para retomar:
-este archivo → `CLAUDE.md` (reglas) → código en `src/` (cada módulo tiene un docstring con su método).
+**Última actualización:** 2026-11-06 (sesión 1, cierre). Punto de entrada para retomar:
+este archivo → `CLAUDE.md` (reglas) → `CONTEXTO.md` (decisiones y trampas) → `docs/METODOLOGIA.md` y
+`docs/ARQUITECTURA.md` → `.claude/memory/project.md` (historial).
 
 ## 0. Estado en una línea
 
-**Motor de análisis en Python TERMINADO y probado con datos reales** (`python scripts/probar_local.py --rapido`
-corre de punta a punta en ~25 s). **FALTAN**: notebooks de Colab, README con badges, docs y tests (§3).
+**Versión 0.1.0 completa y pusheada**: motor en `src/`, notebooks 01 (análisis) y 02 (seguimiento) con badges de
+Colab en el README, corrida de ejemplo, 57 tests con CI y documentación. Verificado en la PC (análisis completo,
+notebooks ejecutados con nbconvert, reporte revisado). **Pendiente: que el usuario corra los notebooks en Colab.**
 
-## 1. Objetivo (pedido del usuario, 2026-11-06)
+## 1. Qué hay
 
-Notebook de Colab, abrible desde el README, donde el usuario edita una lista de tickers y obtiene:
-1. qué activos están **artificialmente bajos** (métricas técnicas, estadísticas y fundamentales avanzadas);
-2. **portafolios** que maximizan retorno minimizando varianza (Markowitz, Sharpe, etc.) y **qué comprar**;
-3. **registro** de cada corrida para medir después (ex-post) cómo le fue a cada alternativa.
+| Pieza | Dónde | Estado |
+|---|---|---|
+| Lista por defecto (87 tickers, 81 analizados) | `data/universo.csv` | al día (2026-11-06) |
+| Motor de análisis (clase `Analisis`) | `src/` (18 módulos) | probado con datos reales |
+| Notebook 01: oportunidades, portafolios, qué comprar, backtest, registro, ZIP | `notebooks/01_oportunidades_y_portafolios.ipynb` | ejecutado local sin errores |
+| Notebook 02: seguimiento ex-post | `notebooks/02_seguimiento_expost.ipynb` | ejecutado local sin errores |
+| Corrida de ejemplo (usada por el 02 si no hay corridas propias) | `data/ejemplo_registro/20261106_204148/` | datos al 2026-11-06 |
+| Generador de notebooks | `scripts/gen_notebooks.py` | — |
+| Corrida completa en la PC | `scripts/probar_local.py` | ~60 s completa, ~25 s `--rapido` |
+| Tests (sintéticos, sin red) | `tests/` (57) + `.github/workflows/tests.yml` (Python 3.12) | 57 OK en la PC |
 
-## 2. Decisiones tomadas (preguntas respondidas por el usuario el 2026-11-06)
+## 2. Verificación hecha (2026-11-06)
 
-| Tema | Decisión |
-|---|---|
-| Registro de corridas | **Google Drive** (`Mi unidad/oportunidades_inversion/registros/AAAAMMDD_HHMMSS/`); en la PC `registros_local/` |
-| AO28, HJCLO, NPCDO, YMCXO (bono/ONs de BYMA) | **Excluidos** (sin historia gratis en Yahoo ni data912). Módulo de renta fija (TIR/duration) → roadmap |
-| Qué comprar | **Ambos**: acciones/ETFs de EE.UU. y **CEDEARs** (data912, especie D en USD MEP; si solo hay pesos, MEP implícito) |
-| Horizonte | **Mediano (6-12 meses)**: ventana 3 años, rebalanceo trimestral, seguimiento a 1/3/6/12 meses |
-| Correcciones de tickers (decididas por Claude, en `data/universo.csv` columna `nota`) | `UN` excluido (es otro ETF; NU ya está) · `VGII`→`VGIT` · `^IXIC` solo referencia · `BRKB`→`BRK-B` · `BTC`→`BTC-USD` · EXX1/QDVE/VVSM en `.DE` (EUR→USD) · OKLO desde 2024-05-10 y SMR desde 2022-05-03 (antes = precios de SPAC) |
+- `python scripts/probar_local.py` (lista por defecto, fundamentales y backtest): sin errores, 59 s.
+- Notebooks 01 y 02 ejecutados con `jupyter nbconvert --execute` en `_local_run/`: todas las celdas OK.
+- Reporte HTML del ZIP revisado en el navegador integrado (ranking, mapa de señales, precios, frontera, pesos,
+  aporte al riesgo, correlaciones, backtest, IC); corregidos: título pisado por la leyenda, etiquetas encimadas
+  en la frontera, escala de pesos aplastada por la fila "otros", tablas sin formato.
+- `python -m pytest`: 57 OK.
+- **Colab: no verificado** (necesita la cuenta de Google del usuario). Qué mirar en la primera corrida: que la
+  celda SETUP imprima `Versión del repo:` con el último commit, que monte el Drive y que se descargue el ZIP.
 
-Decisiones metodológicas clave (detalle en los docstrings de `src/`):
-- Covarianza con **retornos semanales** + Ledoit-Wolf (con diarios, BTC y ETFs de Xetra muestran correlación
-  falsa baja con EE.UU.: XLK/QDVE 0,56 diaria vs 0,92 semanal).
-- **Gemelos** (corr. semanal ≥ 0,99 y vol. parecida): se optimiza con uno (SPY≈VOO≈VTI, GLD≈IAU, QQQ≈QQQM,
-  BTC≈IBIT, XLK≈VGT≈IYW, VNQ≈SCHH). SSO (2x) NO es gemelo de SPY. Se sacan antes de recortar la ventana.
-- Score de oportunidad = percentiles (técnico 40%, estadístico 30%, fundamental 30%) + señales absolutas;
-  "Oportunidad" = score ≥ 70 y ≥ 2 señales; alertas (cuchillo que cae, trampa de valor...).
-- 8 portafolios: 1/N, mínima varianza, máximo Sharpe, volatilidad objetivo (10%), paridad de riesgo, HRP,
-  Black-Litterman con vistas = score, oportunidades (paridad de riesgo del top 10). Peso máx. 20%.
-- Fundamentales de Yahoo: `dividendYield` viene en %, ADRs con `financialCurrency` distinta (VALE) mezclan
-  monedas → se descartan esas métricas.
+## 3. Cifras vigentes (corrida de ejemplo, datos al 2026-11-06)
 
-## 3. Qué está hecho y qué falta
+- 81 activos: 13 Oportunidad, 5 Oportunidad con alertas, 38 Vigilar, 7 Neutral, 18 Sobreextendida.
+  Top 10: GRID, AIRR, SPMO, AVGO, IEMG, EWZ, VALE, FICO, VVSM.DE, COPX.
+- Ventana de optimización 2023-11-07 → 2026-11-06 (784 días); 71 activos optimizables (OKLO y XE fuera por
+  historia; 8 gemelos). Tasa libre de riesgo 4,00% (^IRX). MEP implícito ~1.560.
+- Máximo Sharpe ex-ante 37,4% / vol 13,7% / Sharpe 2,44 (GLD 20%, EXX1.DE 20%, BRK-B 10%...); mínima varianza
+  13,1% / 6,5%; volatilidad objetivo 28,2% / 10,1%.
+- Backtest dic-2021 → nov-2026 (20 rebalanceos trimestrales, 10 pb): Máximo Sharpe 16,2% anual (Sharpe 0,69,
+  caída máx. −28,6%), Oportunidades 15,5%, Volatilidad objetivo 9,6%, 1/N 12,5%, Black-Litterman 12,0%, Paridad
+  8,5%, SPY 10,5%, HRP 6,6%, Mínima varianza 5,1%.
+- IC del score: +0,003 (t = 0,05), positivo en 40% de los trimestres; oportunidades +0,7% por trimestre contra el
+  promedio, ganan en 50% → el score **no** predijo retornos trimestrales.
 
-**Hecho (sin commitear antes de esta sesión; ver git log):**
-- `data/universo.csv` (87 tickers: 81 activos, 1 referencia, 5 excluidos).
-- `src/`: config, universo, datos, fundamentales, indicadores, senales, metricas, riesgo, portafolios,
-  estrategias, asignacion, backtest, registro, expost, graficos (paleta validada con el skill dataviz),
-  tablas, exportar, pipeline (clase `Analisis`).
-- `scripts/probar_local.py` (corrida completa local). Probado solo en modo `--rapido` (sin fundamentales ni
-  backtest); `fundamentales.py` se probó aparte con 7 tickers.
+Estas cifras se citan en `README.md` (sección "Corrida de ejemplo"), `CONTEXTO.md` §4 y aquí: si se regenera la
+corrida de ejemplo, actualizar los tres.
 
-**Falta (en este orden):**
-1. Correr `python scripts/probar_local.py` COMPLETO (con fundamentales y backtest) y corregir errores.
-2. `tests/` con datos sintéticos (indicadores, métricas, portafolios, asignación, registro/ex-post, backtest
-   sin look-ahead, universo, notebooks) + `.github/workflows/tests.yml` (Python 3.12).
-3. `scripts/gen_notebooks.py` → `notebooks/01_oportunidades_y_portafolios.ipynb` y
-   `notebooks/02_seguimiento_expost.ipynb` (patrón SETUP de los otros repos: clonar/actualizar con
-   `git fetch --depth 1` + `reset --hard`, purgar `src.*`, `pip install -U yfinance`, montar Drive, terminar
-   con ZIP). Probar con nbconvert en `_local_run/`.
-4. Corrida de ejemplo en `data/ejemplo_registro/` (`probar_local.py --guardar-en data/ejemplo_registro`) para
-   que el notebook 02 muestre algo sin corridas propias.
-5. Docs: `README.md` (badges de Colab, uso, métricas, portafolios, aviso legal), `CONTEXTO.md`,
-   `docs/METODOLOGIA.md`, `docs/ARQUITECTURA.md`, `docs/ROADMAP.md`, `CHANGELOG.md`,
-   `.claude/memory/project.md`; memoria global `~/.claude/memory/projects/oportunidades_inversion.md` + core.md.
-6. Revisar los gráficos renderizados (abrir el HTML del ZIP) y verificar el link de Colab.
+## 4. Próximos pasos
 
-## 4. Cómo correr en una PC nueva
+1. El usuario corre el notebook 01 y el 02 en Colab (desde los badges del README). Si algo falla, pegar el error
+   en una sesión nueva: casi seguro es de versiones de Colab (pandas/plotly/yfinance).
+2. Ideas en `docs/ROADMAP.md` (renta fija argentina por TIR, valuación contra la propia historia, robot semanal,
+   mínimo CVaR, restricciones por sector...).
+
+## 5. Rutina
+
+- **Usar**: badge del notebook 01 → configurar → *Ejecutar todas*; semanas después, badge del notebook 02.
+- **Cambiar código**: editar `src/` (o `scripts/gen_notebooks.py` y regenerar) → `python -m pytest` →
+  `python scripts/probar_local.py --rapido` → commit + push (Colab toma el cambio al correr la celda SETUP).
+- **Probar un notebook en la PC**: `cp notebooks/*.ipynb _local_run/` y
+  `python -m jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=900 _local_run/<nb>`.
+- **Regenerar la corrida de ejemplo** (si cambia el formato del registro): borrar la carpeta de
+  `data/ejemplo_registro/` y correr `python scripts/probar_local.py --guardar-en data/ejemplo_registro --sin-zip`;
+  actualizar las cifras de §3, README y CONTEXTO.
+
+## 6. PC nueva
 
 ```bash
 git clone https://github.com/santiagoriverti/oportunidades_inversion.git
 cd oportunidades_inversion
 pip install -r requirements.txt
+PYTHONUTF8=1 python -m pytest
 PYTHONUTF8=1 python scripts/probar_local.py --rapido
 ```

@@ -15,6 +15,9 @@ import numpy as np
 import pandas as pd
 
 
+EPS_VOL = 1e-12  # desvíos menores son ruido de punto flotante (serie constante): Sharpe no definido
+
+
 def tasa_periodo(rf_anual: float, periodos: int) -> float:
     return (1.0 + rf_anual) ** (1.0 / periodos) - 1.0
 
@@ -40,7 +43,7 @@ def sharpe(r: pd.Series, rf_anual: float = 0.0, periodos: int = 252) -> float:
         return np.nan
     ex = r - tasa_periodo(rf_anual, periodos)
     s = r.std(ddof=1)
-    return float(ex.mean() * periodos / (s * np.sqrt(periodos))) if s > 0 else np.nan
+    return float(ex.mean() * periodos / (s * np.sqrt(periodos))) if s > EPS_VOL else np.nan
 
 
 def sortino(r: pd.Series, rf_anual: float = 0.0, periodos: int = 252) -> float:
@@ -49,7 +52,7 @@ def sortino(r: pd.Series, rf_anual: float = 0.0, periodos: int = 252) -> float:
         return np.nan
     ex = r - tasa_periodo(rf_anual, periodos)
     abajo = np.sqrt(np.mean(np.minimum(ex, 0.0) ** 2)) * np.sqrt(periodos)
-    return float(ex.mean() * periodos / abajo) if abajo > 0 else np.nan
+    return float(ex.mean() * periodos / abajo) if abajo > EPS_VOL else np.nan
 
 
 def max_drawdown(r: pd.Series) -> float:

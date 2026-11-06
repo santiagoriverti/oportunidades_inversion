@@ -126,7 +126,8 @@ def z_tendencia(p, n: int = 756):
 
 def media_vida(residuos: pd.Series) -> float:
     """Media vida (días) de un proceso que revierte a la media (Ornstein-Uhlenbeck discreto):
-    Δe_t = α + β·e_{t-1}; media vida = -ln 2 / ln(1 + β). NaN si no revierte (β >= 0)."""
+    Δe_t = α + β·e_{t-1}; media vida = -ln 2 / ln(1 + β). NaN si no revierte (β >= -0,0001: una
+    media vida de más de ~7.000 días no significa nada)."""
     e = pd.Series(residuos).dropna()
     if len(e) < 60:
         return np.nan
@@ -134,7 +135,7 @@ def media_vida(residuos: pd.Series) -> float:
     el = e.shift(1).iloc[1:].to_numpy()
     X = np.column_stack([np.ones_like(el), el])
     beta = np.linalg.lstsq(X, de, rcond=None)[0][1]
-    if not -1.0 < beta < 0.0:
+    if not -1.0 < beta < -1e-4:
         return np.nan
     return float(-np.log(2.0) / np.log1p(beta))
 

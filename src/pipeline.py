@@ -15,13 +15,14 @@ bajar los datos.
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from . import (__version__, asignacion, backtest, datos, estrategias, exportar, fundamentales, graficos,
                indicadores, metricas, portafolios, registro, senales, universo)
-from .config import Config
+from .config import RAIZ, Config
 from .portafolios import NOMBRES
 
 AVISO_LEGAL = ("Herramienta educativa y de análisis cuantitativo. No es asesoramiento financiero ni una "
@@ -217,10 +218,13 @@ class Analisis:
         for g in gemelos:
             gastos = {s: float(gasto.get(s, np.nan)) for s in g}
             validos = {s: v for s, v in gastos.items() if np.isfinite(v)}
+            # "más barato" solo si se pueden comparar (el representante y al menos otro con gasto conocido):
+            # BTC-USD no tiene gasto de fondo, no tiene sentido decir que IBIT es más barato
+            comparable = len(validos) >= 2 and g[0] in validos
             filas.append({
                 "representante": g[0],
                 "equivalentes": ", ".join(g[1:]),
-                "mas_barato": min(validos, key=validos.get) if validos else "",
+                "mas_barato": min(validos, key=validos.get) if comparable else "",
                 "gasto_anual": "; ".join(f"{s} {v:.2%}" for s, v in validos.items()),
             })
         return pd.DataFrame(filas, columns=["representante", "equivalentes", "mas_barato", "gasto_anual"])
@@ -290,12 +294,17 @@ class Analisis:
     def metadata(self) -> dict:
         res = self.portafolios
         v = res["ventana"]
+        config = self.cfg.como_dict()
+        try:  # ruta relativa al repo (no guardar rutas de la PC en el registro)
+            config["ruta_universo"] = Path(config["ruta_universo"]).resolve().relative_to(RAIZ).as_posix()
+        except ValueError:
+            pass
         return {
             "fecha_datos": str(self.fecha_datos.date()),
             "benchmark": self.benchmark,
             "tasa_libre_riesgo": self.rf,
             "fuente_tasa": self.rf_fuente,
-            "config": self.cfg.como_dict(),
+            "config": config,
             "tickers_pedidos": self.universo["ticker"].tolist(),
             "activos_analizados": self.activos,
             "referencias": self.referencias,
@@ -380,11 +389,16 @@ class Analisis:
         d = exportar.carpeta_descargas()
         nombre = nombre or f"oportunidades_{self.fecha_datos:%Y%m%d}"
         xlsx = exportar.excel_resultados(self.hojas_excel(), d / f"{nombre}.xlsx")
+        from . import tablas
+
         bloques = list(self.figuras())
+        bloques.insert(1, ("Oportunidades detectadas", tablas.estilo_senales(
+            self.senales, n=None, solo=["Oportunidad", "Oportunidad con alertas"])))
         if hasattr(self, "resumen"):
-            bloques.insert(3, ("Resumen de portafolios", self.resumen))
+            bloques.insert(4, ("Resumen de portafolios", tablas.estilo_resumen_portafolios(
+                self.resumen.drop(columns=["clave"]))))
         if self.backtest is not None:
-            bloques.append(("Métricas del backtest", self.backtest["metricas"]))
+            bloques.append(("Métricas del backtest", tablas.estilo_backtest(self.backtest["metricas"])))
         html = exportar.reporte_html(f"Oportunidades de inversión — datos al {self.fecha_datos.date()}", bloques,
                                      d / f"{nombre}.html", AVISO_LEGAL)
         leeme = d / "LEEME.txt"

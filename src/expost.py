@@ -125,7 +125,8 @@ def evaluar_corrida(corrida: dict, precios: pd.DataFrame, benchmark: str = "SPY"
     ic = np.nan
     if "score" in sen.columns:
         ok = sen["score"].notna() & sen["retorno_desde_corrida"].notna()
-        if ok.sum() >= 5:
+        # el mismo día de la corrida todos los retornos son 0: no hay correlación que medir
+        if ok.sum() >= 5 and sen.loc[ok, "retorno_desde_corrida"].std() > 0:
             ic = float(sen.loc[ok, "score"].rank().corr(sen.loc[ok, "retorno_desde_corrida"].rank()))
     if "clasificacion" in sen.columns:
         opp = sen[sen["clasificacion"].isin(["Oportunidad", "Oportunidad con alertas"])]
@@ -170,3 +171,30 @@ def evaluar_todas(corridas: list[dict], precios: pd.DataFrame, benchmark: str = 
                              "ic_score_vs_retorno": e["ic"], "pct_oportunidades_ganan": e["pct_oportunidades_ganan"],
                              "retorno_benchmark": e["retorno_benchmark"]} for e in evals])
     return {"evaluaciones": evals, "todas": todas, "ranking": ranking, "senales": senales}
+
+
+def exportar_seguimiento(R: dict, descargar: bool = True) -> str:
+    """Excel + reporte HTML del seguimiento en un ZIP (en Colab se descarga solo). Devuelve la ruta del ZIP."""
+    from . import exportar, graficos
+
+    d = exportar.carpeta_descargas()
+    hoy = pd.Timestamp.today().strftime("%Y%m%d")
+    nombre = f"seguimiento_expost_{hoy}"
+    hojas = {"Ranking": R["ranking"], "Todas_las_corridas": R["todas"], "Senales_por_corrida": R["senales"]}
+    bloques = [("Ranking de estrategias", graficos.fig_ranking_expost(R["ranking"])),
+               ("Tabla del ranking", R["ranking"]), ("Señales por corrida", R["senales"])]
+    for e in R["evaluaciones"]:
+        hojas[f"C_{e['run_id']}"] = e["tabla"]
+        hojas[f"S_{e['run_id']}"] = e["senales"]
+        bloques.append((f"Corrida {e['run_id']} (datos al {e['fecha_datos'].date()}, {e['dias']} días)",
+                        graficos.fig_curvas_expost(e["curvas"], f"Corrida {e['run_id']}: valor de 1 USD")))
+        bloques.append((f"Métricas de la corrida {e['run_id']}", e["tabla"]))
+    xlsx = exportar.excel_resultados(hojas, d / f"{nombre}.xlsx")
+    html = exportar.reporte_html(f"Seguimiento ex-post — {pd.Timestamp.today().date()}", bloques,
+                                 d / f"{nombre}.html",
+                                 "Performance real de las corridas guardadas. No es asesoramiento financiero.")
+    zp = exportar.zip_archivos([xlsx, html], d / f"{nombre}.zip")
+    print(f"ZIP: {zp}")
+    if descargar:
+        exportar.descargar_en_colab(zp)
+    return str(zp)

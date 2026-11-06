@@ -99,14 +99,14 @@ def correr_backtest(precios: pd.DataFrame, candidatos: list[str], cfg, rf: float
         fwd = (p.loc[t_sig, cands] / p.loc[t, cands] - 1.0).astype(float)
         sc = tabla["score"].reindex(cands)
         ok = sc.notna() & fwd.notna()
-        if ok.sum() >= 5:
+        if ok.sum() >= 5 and fwd[ok].std() > 0 and sc[ok].std() > 0:
             filas_ic.append({
                 "fecha": t, "fin": t_sig, "n": int(ok.sum()),
                 "ic_spearman": float(sc[ok].rank().corr(fwd[ok].rank())),
                 "ret_oportunidades": float(fwd.reindex(top).mean()) if top else np.nan,
                 "ret_universo": float(fwd[ok].mean()),
             })
-        if mostrar_progreso:
+        if mostrar_progreso and (i % 5 == 4 or i == len(fechas) - 1):
             print(f"  rebalanceo {i + 1}/{len(fechas)}: {t.date()} ({time.time() - t0:.0f}s)")
     # Un período en que una estrategia no se pudo armar queda en efectivo (retorno 0)
     retornos = pd.DataFrame({k: pd.concat(v) for k, v in rets.items() if v}).fillna(0.0)
