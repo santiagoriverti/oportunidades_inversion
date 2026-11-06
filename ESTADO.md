@@ -30,9 +30,11 @@ notebooks ejecutados con nbconvert, reporte revisado). **Pendiente: que el usuar
 - Reporte HTML del ZIP revisado en el navegador integrado (ranking, mapa de señales, precios, frontera, pesos,
   aporte al riesgo, correlaciones, backtest, IC); corregidos: título pisado por la leyenda, etiquetas encimadas
   en la frontera, escala de pesos aplastada por la fila "otros", tablas sin formato.
-- `python -m pytest`: 57 OK.
-- **Colab: no verificado** (necesita la cuenta de Google del usuario). Qué mirar en la primera corrida: que la
-  celda SETUP imprima `Versión del repo:` con el último commit, que monte el Drive y que se descargue el ZIP.
+- `python -m pytest`: 57 OK. **GitHub Actions** (Python 3.12, Linux): verde en `7e587ee`.
+- Los badges del README abren los dos notebooks en Colab (verificado en el navegador, sin iniciar sesión).
+- **Ejecución en Colab: no verificada** (necesita la cuenta de Google del usuario). Qué mirar en la primera
+  corrida: que la celda SETUP imprima `Versión del repo:` con el último commit, que monte el Drive y que se
+  descargue el ZIP.
 
 ## 3. Cifras vigentes (corrida de ejemplo, datos al 2026-11-06)
 
